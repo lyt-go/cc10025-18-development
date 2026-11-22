@@ -1,0 +1,33 @@
+{
+  "asset_id": "DWD_ORDER_MASTER",
+  "table": "dwd_order_master",
+  "current_version": "v2.3",
+  "renames": [
+    {
+      "field": "order_amount",
+      "old_name": "order_amt",
+      "new_name": "order_amount",
+      "snapshot_id": "VERS-0007",
+      "same_value_evidence": {
+        "check": "row_value_compare",
+        "sampled_rows": 50000,
+        "mismatch_count": 0,
+        "verified_at": "2026-10-12",
+        "verifier": "registry-scan"
+      }
+    },
+    {
+      "field": "buyer_no",
+      "old_name": "buyer_id",
+      "new_name": "buyer_no",
+      "snapshot_id": "VERS-0007",
+      "same_value_evidence": {
+        "check": "row_value_compare",
+        "sampled_rows": 50000,
+        "mismatch_count": 0,
+        "verified_at": "2026-10-12",
+        "verifier": "registry-scan"
+      }
+    }
+  ]
+}

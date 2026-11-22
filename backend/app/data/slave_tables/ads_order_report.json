@@ -1,0 +1,9 @@
+{
+  "table": "ads_order_report",
+  "master_asset": "DWD_ORDER_MASTER",
+  "read_request": {
+    "columns": ["buyer_no"],
+    "filter": "dt='2026-11-20'"
+  },
+  "depends_on": ["buyer_no"]
+}

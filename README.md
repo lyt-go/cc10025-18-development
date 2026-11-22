@@ -69,6 +69,24 @@ npm run dev
 | 回收清理 | `reclaim_job` | 回收任务 | 任务编号、目标资产、回收范围 |
 | 变更通知 | `change_notice` | 变更通知 | 通知编号、关联资产、变更类型 |
 
+## Schema 回滚包
+
+上线回滚时，版本快照支持把快照片段和依赖字段关系导出为可下载的 Schema 回滚包，
+发布人员据此核对字段依赖并走回滚审批：
+
+- `GET /api/rollback/package/{asset_id}`（`?download=1` 直接下载）：按主表注册档案
+  （`app/data/registry_archive/`）生成回滚包，字段逐一对应明确快照；注册档案中
+  有同值依据（旧列名/新列名同值可复查）的字段才是可执行目标，无依据字段仅保留核对。
+- `POST /api/rollback/import`：Schema 注册从回滚包读取目标字段和受影响的数据表，
+  生成回滚审批。
+- `POST /api/rollback/approvals/{id}/trial-read`：用候选方案回放原从表读取请求
+  （`app/data/slave_tables/`），审批记录试读所用的数据版本和实际返回结果，
+  并核对从表是否保留当前列名。
+- `POST /api/rollback/approvals/{id}/submit`：提交审批；确认之前重新识别从表依赖，
+  无同值依据的回滚包、或试读后依赖已变更的旧方案一律拦截。
+
+前端入口：侧边栏「Schema回滚」（`/schema_rollback`）。验收测试：`backend/test_rollback_package.py`。
+
 ## 约定
 
 - 全部模块共享`frontend/src/views/WorkbenchView.vue|tsx`和一套资源路由。

@@ -16,6 +16,9 @@ from app.services.base import BaseModuleService
 from app.store import store
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "snapshots")
+ARCHIVE_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "registry_archive")
+SLAVE_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "slave_tables")
+PACKAGE_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "rollback_packages")
 
 
 class VersionSnapshotService(BaseModuleService):
@@ -31,6 +34,113 @@ class VersionSnapshotService(BaseModuleService):
     def __init__(self):
         super().__init__()
         os.makedirs(DATA_DIR, exist_ok=True)
+        os.makedirs(PACKAGE_DIR, exist_ok=True)
+
+    def build_rollback_package(self, asset_id: str) -> tuple[dict[str, Any] | None, str]:
+        """导出 Schema 回滚包：快照片段 + 依赖字段关系，供发布人员核对字段依赖。
+
+        回滚包中的字段必须对应明确快照；注册档案里拿不出同值依据的字段
+        保留在包内供核对，但标记为不可执行目标。
+        """
+        archive = self._load_registry_archive(asset_id)
+        if archive is None:
+            return None, f"资产 {asset_id} 没有注册档案，无法生成Schema回滚包"
+
+        slave_tables = self._load_slave_tables(asset_id)
+        fields: list[dict[str, Any]] = []
+        fragments: dict[str, dict[str, Any]] = {}
+        for rename in archive.get("renames", []):
+            snapshot_id = str(rename.get("snapshot_id", ""))
+            fragment = self._snapshot_fragment(asset_id, snapshot_id)
+            if fragment is not None:
+                fragments[snapshot_id] = fragment
+            evidence = rename.get("same_value_evidence")
+            new_name = str(rename.get("new_name", ""))
+            affected = sorted(
+                slave["table"] for slave in slave_tables
+                if new_name in slave.get("depends_on", [])
+            )
+            fields.append({
+                "field": str(rename.get("field", "")),
+                "old_name": str(rename.get("old_name", "")),
+                "new_name": new_name,
+                "snapshot_id": snapshot_id,
+                "snapshot_verified": fragment is not None,
+                "same_value_evidence": evidence,
+                "executable": bool(evidence) and fragment is not None,
+                "affected_tables": affected,
+            })
+
+        package = {
+            "package_id": f"RBPK-{asset_id}-{int(datetime.now(timezone.utc).timestamp())}",
+            "package_type": "schema_rollback",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "asset_id": asset_id,
+            "table": str(archive.get("table", "")),
+            "snapshots": [fragments[key] for key in sorted(fragments)],
+            "fields": fields,
+        }
+        path = os.path.join(PACKAGE_DIR, f"schema_rollback_{asset_id}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(package, f, ensure_ascii=False, indent=2, default=str)
+
+        self._write_audit_entry(
+            entity="版本快照",
+            action="导出回滚包",
+            target_id=package["package_id"],
+            detail=f"Schema回滚包: {asset_id}, 字段{len(fields)}个, "
+                   f"可执行{sum(1 for item in fields if item['executable'])}个",
+        )
+        return package, f"Schema回滚包已生成: {asset_id}（{len(fields)}个依赖字段）"
+
+    def _load_registry_archive(self, asset_id: str) -> dict[str, Any] | None:
+        path = os.path.join(ARCHIVE_DIR, f"{asset_id}.json")
+        if not os.path.exists(path):
+            return None
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def _load_slave_tables(self, asset_id: str) -> list[dict[str, Any]]:
+        if not os.path.isdir(SLAVE_DIR):
+            return []
+        tables = []
+        for fname in sorted(os.listdir(SLAVE_DIR)):
+            if not fname.endswith(".json"):
+                continue
+            with open(os.path.join(SLAVE_DIR, fname), "r", encoding="utf-8") as f:
+                slave = json.load(f)
+            if str(slave.get("master_asset", "")) == asset_id:
+                tables.append(slave)
+        return tables
+
+    def _snapshot_fragment(self, asset_id: str, snapshot_id: str) -> dict[str, Any] | None:
+        """按快照编号取快照片段，确认回滚包字段对应明确快照。"""
+        if not snapshot_id:
+            return None
+        for row in store.rows(self.MODULE):
+            if str(row.get("快照编号", "")) == snapshot_id:
+                return {
+                    "snapshot_id": snapshot_id,
+                    "asset_id": str(row.get("关联资产", "")),
+                    "snapshot_time": str(row.get("快照时间", "")),
+                    "snapshot_type": str(row.get("快照类型", "")),
+                    "data_volume": str(row.get("数据量", "")),
+                    "status": str(row.get("快照状态", "")) or str(row.get("status", "")),
+                }
+        for fname in os.listdir(DATA_DIR):
+            if not fname.endswith(f"_{snapshot_id}.json"):
+                continue
+            with open(os.path.join(DATA_DIR, fname), "r", encoding="utf-8") as f:
+                record = json.load(f)
+            return {
+                "snapshot_id": snapshot_id,
+                "asset_id": str(record.get("asset_id", "")),
+                "snapshot_time": str(record.get("snapshot_time", "")),
+                "snapshot_type": str(record.get("snapshot_type", "")),
+                "data_volume": str(record.get("data_volume", "")),
+                "status": str(record.get("status", "")),
+            }
+        return None
 
     def create_snapshot(self, entry_id: int) -> tuple[dict[str, Any] | None, str]:
         entry = store.find(self.MODULE, entry_id)

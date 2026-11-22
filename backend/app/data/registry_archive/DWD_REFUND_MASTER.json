@@ -1,0 +1,14 @@
+{
+  "asset_id": "DWD_REFUND_MASTER",
+  "table": "dwd_refund_master",
+  "current_version": "v1.8",
+  "renames": [
+    {
+      "field": "refund_amount",
+      "old_name": "refund_fee",
+      "new_name": "refund_amount",
+      "snapshot_id": "VERS-0008",
+      "same_value_evidence": null
+    }
+  ]
+}

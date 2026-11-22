@@ -1,0 +1,11 @@
+{
+  "asset_id": "DWD_ORDER_MASTER",
+  "table": "dwd_order_master",
+  "data_version": "2026.11.20-v2.3",
+  "columns": ["order_id", "order_amount", "buyer_no", "dt"],
+  "rows": [
+    {"order_id": "O1001", "order_amount": 128.5, "buyer_no": "B1001", "dt": "2026-11-20"},
+    {"order_id": "O1002", "order_amount": 96.0, "buyer_no": "B1002", "dt": "2026-11-20"},
+    {"order_id": "O1003", "order_amount": 45.75, "buyer_no": "B1003", "dt": "2026-11-20"}
+  ]
+}

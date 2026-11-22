@@ -1,0 +1,9 @@
+{
+  "table": "dws_order_daily",
+  "master_asset": "DWD_ORDER_MASTER",
+  "read_request": {
+    "columns": ["order_amount", "buyer_no"],
+    "filter": "dt='2026-11-20'"
+  },
+  "depends_on": ["order_amount", "buyer_no"]
+}

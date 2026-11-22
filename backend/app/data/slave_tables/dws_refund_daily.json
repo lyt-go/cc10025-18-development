@@ -1,0 +1,9 @@
+{
+  "table": "dws_refund_daily",
+  "master_asset": "DWD_REFUND_MASTER",
+  "read_request": {
+    "columns": ["refund_amount"],
+    "filter": "dt='2026-11-20'"
+  },
+  "depends_on": ["refund_amount"]
+}
